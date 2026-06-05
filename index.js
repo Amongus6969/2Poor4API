@@ -385,10 +385,9 @@ async function insertAsCharacterReply() {
         await ensureItemizedPromptForInsertedReply();
         await st.saveReply({
             type: 'normal',
-            getMessage: responseText.trim(),
+            getMessage: responseText,
             fromStreaming: false,
             title: '',
-            swipes: [responseText.trim()],
         });
 
         if (typeof st.saveChat === 'function') {
