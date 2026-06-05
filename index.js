@@ -18,6 +18,8 @@ const state = {
     fetchGuardTimeout: null,
     expectedReplyMessageId: null,
     capturedItemizedPrompt: null,
+    pendingPromptWarningShown: false,
+    captureFailureWarningShown: false,
 };
 
 function context() {
@@ -104,7 +106,7 @@ function findCapturedItemizedPrompt() {
     if (!Array.isArray(itemizedPrompts) || state.expectedReplyMessageId === null) {
         return null;
     }
-    return itemizedPrompts.find(prompt => prompt?.mesId === state.expectedReplyMessageId && prompt.rawPrompt !== undefined) ?? null;
+    return itemizedPrompts.find(prompt => Number(prompt?.mesId) === Number(state.expectedReplyMessageId) && prompt.rawPrompt !== undefined) ?? null;
 }
 
 function storeCapturedUserMessageText() {
@@ -209,22 +211,31 @@ function installFetchGuard() {
         }
 
         let captureError = null;
+        let captured = '';
+        let shouldCleanupGuard = false;
         try {
-            const captured = await waitForCapturedPrompt();
+            captured = await waitForCapturedPrompt();
             if (captured) {
                 notifyInfo('Prompt captured. The API request was blocked before it left the browser.');
-            } else {
-                notifyError('The API request was blocked, but 2Poor4API could not find SillyTavern native raw prompt data for this reply.');
+                shouldCleanupGuard = true;
+            } else if (!state.pendingPromptWarningShown) {
+                state.pendingPromptWarningShown = true;
+                notifyWarning('A generation request was blocked, but the expected SillyTavern raw prompt is not ready yet. The API guard remains active.');
             }
         } catch (error) {
             captureError = error;
-            notifyError('The API request was blocked, but prompt capture failed. Refresh the page before trying again.');
-            console.error(`[${EXTENSION_NAME}] Prompt capture failed after intercepting the generation request.`, error);
+            if (!state.captureFailureWarningShown) {
+                state.captureFailureWarningShown = true;
+                notifyError('The API request was blocked, but prompt capture failed. The API guard remains active. Refresh the page to reset safely.');
+            }
+            console.error(`[${EXTENSION_NAME}] Prompt capture failed after intercepting a generation request. The API guard remains active.`, error);
         } finally {
-            cleanupFetchGuard(false);
-            state.captureMode = false;
-            updateCaptureControls();
-            setTimeout(cleanupAfterBlockedGeneration, 0);
+            if (shouldCleanupGuard) {
+                cleanupFetchGuard(false);
+                state.captureMode = false;
+                updateCaptureControls();
+                setTimeout(cleanupAfterBlockedGeneration, 0);
+            }
         }
 
         const error = new DOMException(`${EXTENSION_NAME} blocked the generation request before it left the browser.`, 'AbortError');
@@ -346,6 +357,8 @@ async function preparePromptWithoutApi() {
     state.expectedReplyMessageId = state.snapshot.expectedReplyMessageId;
     state.capturedPrompt = '';
     state.capturedItemizedPrompt = null;
+    state.pendingPromptWarningShown = false;
+    state.captureFailureWarningShown = false;
     setPromptTextarea('');
     setStatus('Preparing prompt. The final API request will be blocked.');
 
@@ -508,6 +521,8 @@ function clearPopupFields() {
 
     state.capturedPrompt = '';
     state.capturedItemizedPrompt = null;
+    state.pendingPromptWarningShown = false;
+    state.captureFailureWarningShown = false;
     state.snapshot = null;
     state.expectedReplyMessageId = null;
     setPromptTextarea('');

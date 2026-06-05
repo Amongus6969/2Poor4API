@@ -45,7 +45,7 @@ The pasted response is inserted as a normal character reply. The user message is
 
 2Poor4API installs a fail-closed one-shot browser `fetch` guard while prompt capture is active. The guard is designed to intercept only known SillyTavern text-generation endpoints and restore the original `window.fetch` only after the first matching generation request has been intercepted and blocked. If prompt construction takes longer than expected, 2Poor4API shows a warning and keeps the guard active rather than risking an API request leak. The **Abort Capture** button is available only during active capture; it asks SillyTavern to stop generation if possible, but it may leave the guard active when SillyTavern cannot be proven stopped. Refreshing the page is the safe recovery path.
 
-The extension intentionally triggers SillyTavern's normal Send flow because that is what lets SillyTavern add the user message, run user-input regexes, activate World Info, apply Author's Note, run enabled prompt-modifying extensions, run Prompt Manager, and build the final native raw prompt.
+The extension intentionally triggers SillyTavern's normal Send flow because that is what lets SillyTavern add the user message, run user-input regexes, activate World Info, apply Author's Note, run enabled prompt-modifying extensions, run Prompt Manager, and build the final native raw prompt. If an unrelated or background generation request is blocked before the expected raw prompt is ready, 2Poor4API keeps the guard active rather than risking an API leak. If capture cannot complete, refreshing the page is the safe recovery path.
 
 ## Native Prompt Compatibility
 
@@ -133,6 +133,10 @@ This is expected in v1. Group generation has different control flow and prompt o
 19. Start prompt capture and verify **Abort Capture** appears; click it and verify 2Poor4API asks SillyTavern to stop but keeps the API guard active if it cannot prove the native flow is fully stopped.
 20. Simulate or observe an uncertain abort and verify 2Poor4API keeps the guard active and tells the user to refresh the page.
 21. Select the Kobold backend, prepare a prompt, and verify `/api/backends/kobold/generate` is intercepted and never reaches the server.
+22. Simulate or trigger a quiet/background generation during capture and verify the first unrelated generation request is blocked.
+23. Verify the API guard remains active after that unrelated request is blocked.
+24. Verify the later real character-generation request is also blocked.
+25. Verify `window.fetch` is restored only after the expected raw prompt for the character reply is captured.
 
 ## Implementation Notes
 
