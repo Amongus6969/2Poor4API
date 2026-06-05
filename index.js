@@ -182,6 +182,7 @@ function isGenerationRequest(input, init) {
     const generationPaths = [
         '/api/backends/chat-completions/generate',
         '/api/backends/text-completions/generate',
+        '/api/backends/kobold/generate',
         '/api/openai/generate',
         '/api/kobold/generate',
         '/api/textgenerationwebui/generate',
@@ -193,7 +194,9 @@ function isGenerationRequest(input, init) {
         '/api/v1/generate',
     ];
 
-    return generationPaths.some(endpoint => path.endsWith(endpoint)) || /^\/api\/[^/]+\/generate(?:$|[/?#])/.test(path);
+    return generationPaths.some(endpoint => path.endsWith(endpoint))
+        || /^\/api\/backends\/[^/]+\/generate(?:$|[/?#])/.test(path)
+        || /^\/api\/[^/]+\/generate(?:$|[/?#])/.test(path);
 }
 
 function installFetchGuard() {
@@ -479,25 +482,6 @@ function fallbackCopyText(text) {
     }
 }
 
-async function waitForGenerationStopped(timeoutMs = 5000, stableSamples = 5) {
-    const started = Date.now();
-    let stoppedSamples = 0;
-
-    while (Date.now() - started < timeoutMs) {
-        if (isGenerationInProgress()) {
-            stoppedSamples = 0;
-        } else {
-            stoppedSamples += 1;
-            if (stoppedSamples >= stableSamples) {
-                return true;
-            }
-        }
-        await new Promise(resolve => setTimeout(resolve, 200));
-    }
-
-    return false;
-}
-
 async function abortCapture() {
     if (!isCaptureActive()) {
         notifyWarning('No prompt capture is currently in progress.');
@@ -505,27 +489,15 @@ async function abortCapture() {
     }
 
     const st = context();
-    if (typeof st.stopGeneration !== 'function') {
-        notifyError('2Poor4API cannot safely stop the active SillyTavern generation flow. Refresh the page to keep the API guard in place and prevent a request leak.');
-        return;
-    }
-
-    notifyWarning('Stopping SillyTavern generation before aborting prompt capture. The API guard remains active until stopping is confirmed.');
-
     try {
-        await st.stopGeneration();
-        const stopped = await waitForGenerationStopped();
-        if (!stopped) {
-            notifyError('2Poor4API could not confirm that SillyTavern generation stopped. The API guard remains active. Refresh the page before trying again.');
-            return;
+        if (typeof st.stopGeneration === 'function') {
+            await st.stopGeneration();
         }
-
-        cleanupFetchGuard(true);
-        notifyInfo('Prompt capture aborted after SillyTavern generation stopped.');
     } catch (error) {
-        notifyError('2Poor4API could not safely abort prompt capture. The API guard remains active. Refresh the page before trying again.');
-        console.error(`[${EXTENSION_NAME}] Failed to safely abort prompt capture.`, error);
+        console.error(`[${EXTENSION_NAME}] SillyTavern stopGeneration failed during capture abort.`, error);
     }
+
+    notifyError('Abort was requested, but 2Poor4API cannot safely remove the API guard until SillyTavern finishes or the page is refreshed. Refresh the page to reset safely.');
 }
 
 function clearPopupFields() {
