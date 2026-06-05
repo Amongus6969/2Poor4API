@@ -1,0 +1,84 @@
+#poor4api_modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+#poor4api_modal[hidden] {
+  display: none;
+}
+
+#poor4api_modal .poor4api-dialog {
+  width: min(980px, 96vw);
+  max-height: 94vh;
+  overflow: auto;
+  border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.25));
+  border-radius: 10px;
+  background: var(--SmartThemeBlurTintColor, var(--SmartThemeBodyColor, #1f1f1f));
+  color: var(--SmartThemeBodyTextColor, #eeeeee);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.45);
+}
+
+.poor4api-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.poor4api-header h2 {
+  margin: 0 0 0.25rem;
+}
+
+.poor4api-header p {
+  margin: 0;
+  opacity: 0.85;
+}
+
+.poor4api-label {
+  font-weight: 600;
+}
+
+.poor4api-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 12rem;
+  resize: vertical;
+}
+
+.poor4api-prompt {
+  min-height: 18rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  white-space: pre;
+}
+
+.poor4api-response {
+  min-height: 14rem;
+}
+
+.poor4api-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.poor4api-actions-primary,
+.poor4api-actions-footer {
+  justify-content: flex-start;
+}
+
+.poor4api-status {
+  min-height: 1.25rem;
+  margin: 0;
+  opacity: 0.9;
+}
+
+#poor4api_wand_button {
+  cursor: pointer;
+}
