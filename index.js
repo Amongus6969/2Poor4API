@@ -90,6 +90,15 @@ function findCapturedItemizedPrompt() {
     return itemizedPrompts.find(prompt => prompt?.mesId === state.expectedReplyMessageId && prompt.rawPrompt !== undefined) ?? null;
 }
 
+function storeCapturedUserMessageText() {
+    if (!state.snapshot) {
+        return;
+    }
+
+    const st = context();
+    state.snapshot.capturedUserMessageText = st.chat?.[state.snapshot.expectedUserMessageId]?.mes;
+}
+
 function cloneItemizedPrompt(prompt) {
     if (!prompt) {
         return null;
@@ -112,6 +121,7 @@ async function waitForCapturedPrompt() {
         if (rawText) {
             state.capturedItemizedPrompt = cloneItemizedPrompt(prompt);
             state.capturedPrompt = rawText;
+            storeCapturedUserMessageText();
             setPromptTextarea(rawText);
             return rawText;
         }
@@ -347,6 +357,9 @@ function validateCanInsert(responseText) {
     const lastMessage = st.chat?.[st.chat.length - 1];
     if (!lastMessage?.is_user) {
         return 'The last chat message is not the user message that was captured. 2Poor4API will not insert a response.';
+    }
+    if (lastMessage.mes !== snapshot.capturedUserMessageText) {
+        return 'The captured user message was edited after the prompt was prepared. Prepare the prompt again before inserting a response.';
     }
     return '';
 }
