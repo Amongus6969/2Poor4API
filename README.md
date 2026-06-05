@@ -43,7 +43,7 @@ The pasted response is inserted as a normal character reply. The user message is
 
 ## Prompt Privacy
 
-2Poor4API installs a fail-closed one-shot browser `fetch` guard while prompt capture is active. The guard is designed to intercept only known SillyTavern text-generation endpoints and restore the original `window.fetch` only after the first matching generation request has been intercepted and blocked. If prompt construction takes longer than expected, 2Poor4API shows a warning and keeps the guard active rather than risking an API request leak.
+2Poor4API installs a fail-closed one-shot browser `fetch` guard while prompt capture is active. The guard is designed to intercept only known SillyTavern text-generation endpoints and restore the original `window.fetch` only after the first matching generation request has been intercepted and blocked. If prompt construction takes longer than expected, 2Poor4API shows a warning and keeps the guard active rather than risking an API request leak. The **Abort Capture** button is available only during active capture; it first asks SillyTavern to stop generation and only removes the guard after stopping is confirmed.
 
 The extension intentionally triggers SillyTavern's normal Send flow because that is what lets SillyTavern add the user message, run user-input regexes, activate World Info, apply Author's Note, run enabled prompt-modifying extensions, run Prompt Manager, and build the final native raw prompt.
 
@@ -130,6 +130,8 @@ This is expected in v1. Group generation has different control flow and prompt o
 16. Start prompt capture, close the popup immediately, and verify the later generation request is still blocked.
 17. Start prompt capture with a slow or large chat and verify the guard remains active after the warning timeout.
 18. Start prompt capture and click **Clear**; verify it does not reset the capture state while capture is in progress.
+19. Start prompt capture and verify **Abort Capture** appears; click it and verify the guard is removed only after SillyTavern generation is stopped.
+20. Simulate or observe a failed abort confirmation and verify 2Poor4API keeps the guard active and tells the user to refresh the page.
 
 ## Implementation Notes
 

@@ -56,6 +56,23 @@ function setStatus(message) {
     if (status) {
         status.textContent = message || '';
     }
+    updateCaptureControls();
+}
+
+function isCaptureActive() {
+    return Boolean(state.captureMode || state.originalFetch);
+}
+
+function updateCaptureControls() {
+    const abortButton = document.getElementById('poor4api_abort');
+    if (!abortButton) {
+        return;
+    }
+
+    const active = isCaptureActive();
+    abortButton.hidden = !active;
+    abortButton.disabled = !active;
+    abortButton.setAttribute('aria-disabled', String(!active));
 }
 
 function setPromptTextarea(value) {
@@ -188,30 +205,41 @@ function installFetchGuard() {
             return state.originalFetch(input, init);
         }
 
-        const captured = await waitForCapturedPrompt();
-        cleanupFetchGuard(false);
-        state.captureMode = false;
-
-        if (captured) {
-            notifyInfo('Prompt captured. The API request was blocked before it left the browser.');
-        } else {
-            notifyError('The API request was blocked, but 2Poor4API could not find SillyTavern native raw prompt data for this reply.');
+        let captureError = null;
+        try {
+            const captured = await waitForCapturedPrompt();
+            if (captured) {
+                notifyInfo('Prompt captured. The API request was blocked before it left the browser.');
+            } else {
+                notifyError('The API request was blocked, but 2Poor4API could not find SillyTavern native raw prompt data for this reply.');
+            }
+        } catch (error) {
+            captureError = error;
+            notifyError('The API request was blocked, but prompt capture failed. Refresh the page before trying again.');
+            console.error(`[${EXTENSION_NAME}] Prompt capture failed after intercepting the generation request.`, error);
+        } finally {
+            cleanupFetchGuard(false);
+            state.captureMode = false;
+            updateCaptureControls();
+            setTimeout(cleanupAfterBlockedGeneration, 0);
         }
-
-        setTimeout(cleanupAfterBlockedGeneration, 0);
 
         const error = new DOMException(`${EXTENSION_NAME} blocked the generation request before it left the browser.`, 'AbortError');
         error.poor4apiBlocked = true;
+        if (captureError) {
+            error.cause = captureError;
+        }
         throw error;
     };
 
     state.fetchGuardTimeout = window.setTimeout(() => {
         state.fetchGuardTimeout = null;
-        if (state.captureMode || state.originalFetch) {
+        if (isCaptureActive()) {
             notifyWarning('Still waiting for SillyTavern to finish building the prompt. The API guard remains active.');
         }
     }, FETCH_GUARD_TIMEOUT_MS);
 
+    updateCaptureControls();
     void state.originalFetch;
 }
 
@@ -229,6 +257,7 @@ function cleanupFetchGuard(resetCaptureMode = true) {
     if (resetCaptureMode) {
         state.captureMode = false;
     }
+    updateCaptureControls();
 }
 
 async function cleanupAfterBlockedGeneration() {
@@ -266,7 +295,7 @@ function validateCanPrepare() {
     if (!userText.trim()) {
         return 'Type a message in the normal SillyTavern input box before preparing a prompt.';
     }
-    if (state.captureMode || state.originalFetch) {
+    if (isCaptureActive()) {
         return '2Poor4API is already preparing a prompt.';
     }
     if (isGenerationInProgress()) {
@@ -450,8 +479,57 @@ function fallbackCopyText(text) {
     }
 }
 
+async function waitForGenerationStopped(timeoutMs = 5000, stableSamples = 5) {
+    const started = Date.now();
+    let stoppedSamples = 0;
+
+    while (Date.now() - started < timeoutMs) {
+        if (isGenerationInProgress()) {
+            stoppedSamples = 0;
+        } else {
+            stoppedSamples += 1;
+            if (stoppedSamples >= stableSamples) {
+                return true;
+            }
+        }
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+
+    return false;
+}
+
+async function abortCapture() {
+    if (!isCaptureActive()) {
+        notifyWarning('No prompt capture is currently in progress.');
+        return;
+    }
+
+    const st = context();
+    if (typeof st.stopGeneration !== 'function') {
+        notifyError('2Poor4API cannot safely stop the active SillyTavern generation flow. Refresh the page to keep the API guard in place and prevent a request leak.');
+        return;
+    }
+
+    notifyWarning('Stopping SillyTavern generation before aborting prompt capture. The API guard remains active until stopping is confirmed.');
+
+    try {
+        await st.stopGeneration();
+        const stopped = await waitForGenerationStopped();
+        if (!stopped) {
+            notifyError('2Poor4API could not confirm that SillyTavern generation stopped. The API guard remains active. Refresh the page before trying again.');
+            return;
+        }
+
+        cleanupFetchGuard(true);
+        notifyInfo('Prompt capture aborted after SillyTavern generation stopped.');
+    } catch (error) {
+        notifyError('2Poor4API could not safely abort prompt capture. The API guard remains active. Refresh the page before trying again.');
+        console.error(`[${EXTENSION_NAME}] Failed to safely abort prompt capture.`, error);
+    }
+}
+
 function clearPopupFields() {
-    if (state.captureMode || state.originalFetch) {
+    if (isCaptureActive()) {
         notifyWarning('Prompt capture is still in progress. Wait until it finishes before clearing the popup.');
         return;
     }
@@ -475,6 +553,7 @@ async function openPopup() {
     if (document.getElementById(MODAL_ID)) {
         document.getElementById(MODAL_ID).hidden = false;
         setPromptTextarea(state.capturedPrompt);
+        updateCaptureControls();
         return;
     }
 
@@ -488,6 +567,7 @@ async function openPopup() {
     state.popup = modal;
 
     modal.querySelector('#poor4api_prepare')?.addEventListener('click', preparePromptWithoutApi);
+    modal.querySelector('#poor4api_abort')?.addEventListener('click', abortCapture);
     modal.querySelector('#poor4api_copy')?.addEventListener('click', copyPrompt);
     modal.querySelector('#poor4api_insert')?.addEventListener('click', insertAsCharacterReply);
     modal.querySelector('#poor4api_clear')?.addEventListener('click', clearPopupFields);
@@ -499,6 +579,7 @@ async function openPopup() {
     });
 
     setPromptTextarea(state.capturedPrompt);
+    updateCaptureControls();
 }
 
 function addMenuItem() {
@@ -539,14 +620,21 @@ function waitForExtensionsMenu() {
     }
 
     let attempts = 0;
+    let observer;
     const interval = window.setInterval(() => {
         attempts += 1;
-        if (addMenuItem() || attempts >= 40) {
+        if (addMenuItem()) {
             clearInterval(interval);
+            observer?.disconnect();
+            return;
+        }
+        if (attempts >= 40) {
+            clearInterval(interval);
+            observer?.disconnect();
         }
     }, 250);
 
-    const observer = new MutationObserver(() => {
+    observer = new MutationObserver(() => {
         if (addMenuItem()) {
             observer.disconnect();
             clearInterval(interval);
