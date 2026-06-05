@@ -43,7 +43,7 @@ The pasted response is inserted as a normal character reply. The user message is
 
 ## Prompt Privacy
 
-2Poor4API installs a one-shot browser `fetch` guard only while prompt capture is active. The guard is designed to intercept only known SillyTavern text-generation endpoints, restore the original `window.fetch` immediately after the first matching generation request is intercepted, and use a safety timeout so the fetch patch is not left installed.
+2Poor4API installs a fail-closed one-shot browser `fetch` guard while prompt capture is active. The guard is designed to intercept only known SillyTavern text-generation endpoints and restore the original `window.fetch` only after the first matching generation request has been intercepted and blocked. If prompt construction takes longer than expected, 2Poor4API shows a warning and keeps the guard active rather than risking an API request leak.
 
 The extension intentionally triggers SillyTavern's normal Send flow because that is what lets SillyTavern add the user message, run user-input regexes, activate World Info, apply Author's Note, run enabled prompt-modifying extensions, run Prompt Manager, and build the final native raw prompt.
 
@@ -127,6 +127,9 @@ This is expected in v1. Group generation has different control flow and prompt o
 13. The chat is saved.
 14. The native three-dot-menu **Prompt** button works for the inserted reply if possible.
 15. The raw prompt captured by 2Poor4API matches the raw prompt shown by SillyTavern's native **Prompt** button in an equivalent normal API generation.
+16. Start prompt capture, close the popup immediately, and verify the later generation request is still blocked.
+17. Start prompt capture with a slow or large chat and verify the guard remains active after the warning timeout.
+18. Start prompt capture and click **Clear**; verify it does not reset the capture state while capture is in progress.
 
 ## Implementation Notes
 

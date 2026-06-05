@@ -188,9 +188,8 @@ function installFetchGuard() {
             return state.originalFetch(input, init);
         }
 
-        cleanupFetchGuard(false);
-
         const captured = await waitForCapturedPrompt();
+        cleanupFetchGuard(false);
         state.captureMode = false;
 
         if (captured) {
@@ -207,10 +206,9 @@ function installFetchGuard() {
     };
 
     state.fetchGuardTimeout = window.setTimeout(() => {
-        const wasCapturing = state.captureMode;
-        cleanupFetchGuard(true);
-        if (wasCapturing) {
-            notifyError('Timed out while waiting for SillyTavern to build the prompt. No API request was sent by 2Poor4API.');
+        state.fetchGuardTimeout = null;
+        if (state.captureMode || state.originalFetch) {
+            notifyWarning('Still waiting for SillyTavern to finish building the prompt. The API guard remains active.');
         }
     }, FETCH_GUARD_TIMEOUT_MS);
 
@@ -453,6 +451,11 @@ function fallbackCopyText(text) {
 }
 
 function clearPopupFields() {
+    if (state.captureMode || state.originalFetch) {
+        notifyWarning('Prompt capture is still in progress. Wait until it finishes before clearing the popup.');
+        return;
+    }
+
     state.capturedPrompt = '';
     state.capturedItemizedPrompt = null;
     state.snapshot = null;
@@ -463,7 +466,6 @@ function clearPopupFields() {
 }
 
 function closePopup() {
-    cleanupFetchGuard(true);
     const modal = document.getElementById(MODAL_ID);
     modal?.remove();
     state.popup = null;
