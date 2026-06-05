@@ -1,0 +1,29 @@
+<section class="poor4api-popup" aria-labelledby="poor4api_title">
+  <header class="poor4api-header">
+    <h2 id="poor4api_title">2Poor4API</h2>
+    <p>Prepare SillyTavern's native raw prompt without sending it to the API, then paste a browser model response back into the chat.</p>
+  </header>
+
+  <div class="poor4api-actions poor4api-actions-primary">
+    <button id="poor4api_prepare" type="button" class="menu_button interactable">Prepare Prompt Without API</button>
+    <button id="poor4api_abort" type="button" class="menu_button interactable" hidden disabled>Abort Capture</button>
+  </div>
+
+  <label for="poor4api_prompt" class="poor4api-label">Captured raw prompt:</label>
+  <textarea id="poor4api_prompt" class="text_pole textarea_compact poor4api-textarea poor4api-prompt" readonly spellcheck="false" placeholder="The captured raw prompt will appear here."></textarea>
+
+  <div class="poor4api-actions">
+    <button id="poor4api_copy" type="button" class="menu_button interactable">Copy Prompt</button>
+  </div>
+
+  <label for="poor4api_response" class="poor4api-label">Paste the response from ChatGPT, Gemini, Claude, or another browser-based model:</label>
+  <textarea id="poor4api_response" class="text_pole textarea_compact poor4api-textarea poor4api-response" spellcheck="true" placeholder="Paste the model response here."></textarea>
+
+  <div class="poor4api-actions poor4api-actions-footer">
+    <button id="poor4api_insert" type="button" class="menu_button interactable">Insert as {{char}} Reply</button>
+    <button id="poor4api_clear" type="button" class="menu_button interactable">Clear</button>
+    <button id="poor4api_close" type="button" class="menu_button interactable">Close</button>
+  </div>
+
+  <p id="poor4api_status" class="poor4api-status" role="status" aria-live="polite"></p>
+</section>
